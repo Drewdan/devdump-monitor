@@ -3,32 +3,25 @@
 namespace Drewdan\DevDumpMonitor\Handler;
 
 use Monolog\Logger;
+use Monolog\LogRecord;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\App;
 use Drewdan\DevDumpMonitor\Dto\LogEntry;
 use Monolog\Handler\AbstractProcessingHandler;
+use Drewdan\DevDumpMonitor\Client\DevDumpMonitorClient;
 
 class DevDumpMonitorHandler extends AbstractProcessingHandler {
 
-	protected $client;
-
-	public function __construct($level = Logger::DEBUG, bool $bubble = true) {
-		parent::__construct($level, $bubble);
-
-		$this->client = App::make(DevDumpMonitorHandler::class);
-	}
-
-	protected function write(array $record): void {
+	protected function write(LogRecord $record): void {
 		if (Str::startsWith($record['message'], 'Received a payload from client')) {
 			return;
 		}
 
 		$logEntry = new LogEntry($record);
 
-		if (config('devdump-monitor.user.retrieve')) {
-			$logEntry->addUserToLog();
-		}
+		// TODO: Wrap this in a config item
+		$logEntry->addUserToLog();
 
-		$this->client->postLog($logEntry);
+		App::make(DevDumpMonitorClient::class)->postLog($logEntry);
 	}
 }

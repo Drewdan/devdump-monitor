@@ -1,5 +1,7 @@
 <?php
 
+namespace Drewdan\DevDumpMonitor;
+
 use Monolog\Logger;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
@@ -8,41 +10,33 @@ use Drewdan\DevDumpMonitor\Handler\DevDumpMonitorHandler;
 
 class DevDumpMonitorServiceProvider extends ServiceProvider {
 
-	public function register() {
+	public function register(): void {
 		$this->mergeConfigFrom(__DIR__ . '/../config/devdump-monitor.php', 'devdump-monitor');
+		$this->registerLogHandler();
 
-		$this->registerLogger();
-
-		$this->app->singleton('dev-dump', function ($app) {
-			return new DevDumpMonitorClient();
+		$this->app->singleton(DevDumpMonitorClient::class, function ($app) {
+			return new DevDumpMonitorClient(
+				config('devdump-monitor.ingress_url'),
+				config('devdump-monitor.key')
+			);
 		});
-
 	}
 
 	public function boot() {
 
 	}
 
-	public function registerLogger() {
-		$this->app->singleton('dev-dump.logger', function ($app) {
-			//this should be the custom handler extending the abstract processing handler
-			$handler = new DevDumpMonitorHandler;
-//
-//            $logLevelString = config('logging.channels.flare.level', 'error');
-//
-//            $logLevel = $this->getLogLevel($logLevelString);
-//
-//            $handler->setMinimumReportLogLevel($logLevel);
+	protected function registerLogHandler(): void {
+		$this->app->singleton('devdump.logger', function ($app) {
+			$handler = new DevDumpMonitorHandler();
 
-			$logger = new Logger('Sentinel');
-			$logger->pushHandler($handler);
-
-			return $logger;
+			return tap(
+				new Logger('DevDumpMonitor'),
+				fn (Logger $logger) => $logger->pushHandler($handler)
+			);
 		});
 
-		Log::extend('sentinel', function ($app) {
-			return $app['dev-dump.logger'];
-		});
+		Log::extend('devdump', fn ($app) => $app['devdump.logger']);
 	}
 
 }
